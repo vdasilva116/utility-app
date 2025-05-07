@@ -1,41 +1,85 @@
 <template>
-  <q-layout view="lHh Lpr lFf">
-    <q-header elevated>
-      <q-toolbar>
-        <q-btn
-          flat
-          dense
-          round
-          icon="menu"
-          aria-label="Menu"
-          @click="toggleLeftDrawer"
-        />
-
-        <q-toolbar-title>
-          Quasar App
-        </q-toolbar-title>
-
-        <div>Quasar v{{ $q.version }}</div>
-      </q-toolbar>
+  <q-layout view="hHh LpR fFf">
+    <q-header elevated class="bg-white text-primary">
+      <q-toolbar class="q-py-md"> </q-toolbar>
     </q-header>
 
     <q-drawer
       v-model="leftDrawerOpen"
+      persistent
       show-if-above
-      bordered
+      side="left"
+      class="bg-grey-1"
+      :width="200"
     >
       <q-list>
-        <q-item-label
-          header
+        <q-item
+          clickable
+          @click="goTo(routePath.calendar)"
+          :active="route.path === '/calendar'"
+          active-class="text-primary"
         >
-          Essential Links
-        </q-item-label>
+          <q-item-section avatar><q-icon name="calendar_month" /></q-item-section>
+          <q-item-section>Calendrier</q-item-section>
+        </q-item>
 
-        <EssentialLink
-          v-for="link in linksList"
-          :key="link.title"
-          v-bind="link"
-        />
+        <q-item
+          clickable
+          @click="goTo(routePath.shopping)"
+          :active="route.path === '/shopping'"
+          active-class="text-primary"
+        >
+          <q-item-section avatar><q-icon name="shopping_cart" /></q-item-section>
+          <q-item-section>Liste de courses</q-item-section>
+        </q-item>
+
+        <q-item
+          clickable
+          @click="goTo(routePath.listnote)"
+          :active="route.path === '/listnote'"
+          active-class="text-primary"
+        >
+          <q-item-section avatar>
+            <q-icon name="note" />
+          </q-item-section>
+          <q-item-section>Bloc-notes</q-item-section>
+        </q-item>
+
+        <q-item
+          clickable
+          @click="goTo(routePath.listgames)"
+          :active="route.path === '/listgames'"
+          active-class="text-primary"
+        >
+          <q-item-section avatar>
+            <q-icon name="games" />
+          </q-item-section>
+          <q-item-section>Jeux</q-item-section>
+        </q-item>
+
+        <q-item
+          clickable
+          @click="goTo(routePath.drawingboard)"
+          :active="route.path === '/drawingboard'"
+          active-class="text-primary"
+        >
+          <q-item-section avatar>
+            <q-icon name="draw" />
+          </q-item-section>
+          <q-item-section>Tableau blanc</q-item-section>
+        </q-item>
+
+        <q-item
+          clickable
+          @click="goTo(routePath.calculator)"
+          :active="route.path === '/calculator'"
+          active-class="text-primary"
+        >
+          <q-item-section avatar>
+            <q-icon name="calculate" />
+          </q-item-section>
+          <q-item-section>Calculatrice</q-item-section>
+        </q-item>
       </q-list>
     </q-drawer>
 
@@ -45,72 +89,16 @@
   </q-layout>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref } from 'vue';
-import EssentialLink, { type EssentialLinkProps } from 'components/EssentialLink.vue';
+<script setup lang="ts">
+import { routePath } from 'src/models/routePath';
+import { ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-const linksList: EssentialLinkProps[] = [
-  {
-    title: 'Docs',
-    caption: 'quasar.dev',
-    icon: 'school',
-    link: 'https://quasar.dev'
-  },
-  {
-    title: 'Github',
-    caption: 'github.com/quasarframework',
-    icon: 'code',
-    link: 'https://github.com/quasarframework'
-  },
-  {
-    title: 'Discord Chat Channel',
-    caption: 'chat.quasar.dev',
-    icon: 'chat',
-    link: 'https://chat.quasar.dev'
-  },
-  {
-    title: 'Forum',
-    caption: 'forum.quasar.dev',
-    icon: 'record_voice_over',
-    link: 'https://forum.quasar.dev'
-  },
-  {
-    title: 'Twitter',
-    caption: '@quasarframework',
-    icon: 'rss_feed',
-    link: 'https://twitter.quasar.dev'
-  },
-  {
-    title: 'Facebook',
-    caption: '@QuasarFramework',
-    icon: 'public',
-    link: 'https://facebook.quasar.dev'
-  },
-  {
-    title: 'Quasar Awesome',
-    caption: 'Community Quasar projects',
-    icon: 'favorite',
-    link: 'https://awesome.quasar.dev'
-  }
-];
+const router = useRouter();
+const route = useRoute();
+const leftDrawerOpen = ref(true);
 
-export default defineComponent({
-  name: 'MainLayout',
-
-  components: {
-    EssentialLink
-  },
-
-  setup () {
-    const leftDrawerOpen = ref(false);
-
-    return {
-      linksList,
-      leftDrawerOpen,
-      toggleLeftDrawer () {
-        leftDrawerOpen.value = !leftDrawerOpen.value;
-      }
-    };
-  }
-});
+const goTo = (uri: string) => {
+  void router.push(uri);
+};
 </script>

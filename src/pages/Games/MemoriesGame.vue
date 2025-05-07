@@ -1,0 +1,159 @@
+<template>
+  <q-page class="q-pa-md row justify-center">
+    <div class="column items-center col-8">
+      <div class="row items-center justify-between full-width q-mb-sm">
+        <div class="text-h5">🧠 Jeu de Memory</div>
+        <q-btn label="Relancer" color="secondary" @click="resetGame" />
+      </div>
+      <div class="text-caption q-mb-md">Temps : {{ elapsedSeconds }}s</div>
+
+      <div class="row q-gutter-sm" style="max-width: 400px">
+        <q-btn
+          v-for="(card, index) in displayedCards"
+          :key="index"
+          class="memory-card"
+          @click="flipCard(index)"
+          :disable="matched[index] || flippedIndices.includes(index)"
+        >
+          <span class="text-h4">
+            {{ matched[index] || flippedIndices.includes(index) ? card : '❓' }}
+          </span>
+        </q-btn>
+      </div>
+
+      <div v-if="allMatched" class="q-mt-lg text-positive">
+        🎉 Bravo ! Tu as tout trouvé en {{ moves }} coups et {{ elapsedSeconds }}s !
+        <q-input v-model="playerName" label="Ton nom" class="q-mt-md" outlined dense />
+        <q-btn label="Enregistrer" color="primary" class="q-mt-sm" @click="saveScore" />
+      </div>
+    </div>
+
+    <div class="col-4 q-ml-md">
+      <div class="text-h6">🏆 Meilleurs scores</div>
+      <q-list bordered separator class="q-mt-sm">
+        <q-item v-for="(s, i) in leaderboard" :key="i">
+          <q-item-section>{{ s.name }}</q-item-section>
+          <q-item-section>{{ s.moves }} coups - {{ s.time }}s</q-item-section>
+        </q-item>
+      </q-list>
+      <q-btn flat label="Reset scores" color="negative" class="q-mt-sm" @click="clearLeaderboard" />
+    </div>
+  </q-page>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+
+interface ScoreEntry {
+  name: string;
+  moves: number;
+  time: number;
+}
+
+const rawCards = ['🐶', '🐱', '🦊', '🐻', '🐼', '🐸', '🐵', '🐔', '🐷', '🐮', '🐯', '🦁'];
+const displayedCards = ref<string[]>([]);
+const matched = ref<boolean[]>([]);
+const flippedIndices = ref<number[]>([]);
+const moves = ref(0);
+const startTime = ref<number>(0);
+const elapsedSeconds = ref(0);
+const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
+const gameFinished = ref(false);
+const playerName = ref('');
+const leaderboard = ref<ScoreEntry[]>([]);
+
+const allMatched = computed(() => matched.value.every((v) => v));
+
+function shuffle() {
+  const all = [...rawCards, ...rawCards];
+  return all.sort(() => 0.5 - Math.random());
+}
+
+function startGame() {
+  displayedCards.value = shuffle();
+  matched.value = Array(displayedCards.value.length).fill(false);
+  flippedIndices.value = [];
+  moves.value = 0;
+  elapsedSeconds.value = 0;
+  gameFinished.value = false;
+  startTime.value = Date.now();
+  if (timerInterval.value) clearInterval(timerInterval.value);
+  timerInterval.value = setInterval(() => {
+    elapsedSeconds.value = Math.floor((Date.now() - startTime.value) / 1000);
+  }, 1000);
+}
+
+function flipCard(index: number) {
+  if (flippedIndices.value.length >= 2 || flippedIndices.value.includes(index)) return;
+  flippedIndices.value.push(index);
+
+  if (flippedIndices.value.length === 2) {
+    moves.value++;
+    const [i1, i2] = flippedIndices.value;
+    if (
+      i1 !== undefined &&
+      i2 !== undefined &&
+      displayedCards.value[i1] === displayedCards.value[i2]
+    ) {
+      matched.value[i1] = true;
+      matched.value[i2] = true;
+      flippedIndices.value = [];
+    } else {
+      setTimeout(() => {
+        flippedIndices.value = [];
+      }, 800);
+    }
+  }
+
+  if (allMatched.value && !gameFinished.value) {
+    gameFinished.value = true;
+    clearInterval(timerInterval.value!);
+  }
+}
+
+function resetGame() {
+  playerName.value = '';
+  startGame();
+}
+
+function saveScore() {
+  if (!playerName.value.trim()) return;
+  leaderboard.value.push({
+    name: playerName.value.trim(),
+    moves: moves.value,
+    time: elapsedSeconds.value,
+  });
+  leaderboard.value.sort((a, b) => a.moves - b.moves || a.time - b.time);
+  leaderboard.value = leaderboard.value.slice(0, 5);
+  localStorage.setItem('memoryScores', JSON.stringify(leaderboard.value));
+  resetGame();
+}
+
+function clearLeaderboard() {
+  leaderboard.value = [];
+  localStorage.removeItem('memoryScores');
+}
+
+onMounted(() => {
+  const stored = localStorage.getItem('memoryScores');
+  if (stored) leaderboard.value = JSON.parse(stored);
+  startGame();
+});
+
+onBeforeUnmount(() => {
+  if (timerInterval.value) clearInterval(timerInterval.value);
+});
+</script>
+
+<style scoped>
+.memory-card {
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  border-radius: 8px;
+}
+</style>

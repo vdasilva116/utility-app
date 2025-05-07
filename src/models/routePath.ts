@@ -1,0 +1,15 @@
+export const routePath = {
+  home: '/home',
+  calendar: '/calendar',
+  shopping: '/shopping',
+  notepad: '/notepad',
+  listnote: '/listnote',
+  listgames: '/listgames',
+  tictactoe: '/listgames/tictactoe',
+  snake: '/listgames/snake',
+  pendu: '/listgames/pendu',
+  memories: '/listgames/memories',
+  2048: '/listgames/2048',
+  drawingboard: '/drawingboard',
+  calculator: '/calculator',
+};
