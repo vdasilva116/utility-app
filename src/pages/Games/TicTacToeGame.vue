@@ -45,24 +45,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { onMounted, ref } from 'vue';
+import { supabase } from 'boot/supabase';
 
 const board = ref<('X' | 'O' | null)[]>(Array(9).fill(null));
 const currentPlayer = ref<'X' | 'O'>('X');
 const winner = ref<string | null>(null);
-
-const storedScore = localStorage.getItem('tictactoe-score');
-const score = ref<{ X: number; O: number; draw: number }>(
-  storedScore ? JSON.parse(storedScore) : { X: 0, O: 0, draw: 0 },
-);
-
-watch(
-  score,
-  (val) => {
-    localStorage.setItem('tictactoe-score', JSON.stringify(val));
-  },
-  { deep: true },
-);
+const score = ref<{ X: number; O: number; draw: number }>({ X: 0, O: 0, draw: 0 });
 
 function makeMove(index: number) {
   if (board.value[index] !== null || winner.value) return;
@@ -92,6 +81,7 @@ function checkWinner() {
     if (va && va === vb && va === vc) {
       winner.value = va;
       score.value[va]++;
+      void updateScoreInDb();
       return;
     }
   }
@@ -99,6 +89,7 @@ function checkWinner() {
   if (board.value.every((cell) => cell !== null)) {
     winner.value = 'Draw';
     score.value.draw++;
+    void updateScoreInDb();
   }
 }
 
@@ -108,10 +99,37 @@ function resetGame() {
   winner.value = null;
 }
 
-function resetScore() {
+async function resetScore() {
   score.value = { X: 0, O: 0, draw: 0 };
-  localStorage.setItem('tictactoe-score', JSON.stringify(score.value));
+  await supabase.from('scores_tictactoe').delete().neq('id', '');
 }
+
+async function loadScore() {
+  const { data, error } = await supabase
+    .from('scores_tictactoe')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (!error && data && data.length > 0) {
+    const s = data[0];
+    score.value = { X: s.x, O: s.o, draw: s.draw };
+  }
+}
+
+async function updateScoreInDb() {
+  await supabase.from('scores_tictactoe').insert([
+    {
+      x: score.value.X,
+      o: score.value.O,
+      draw: score.value.draw,
+    },
+  ]);
+}
+
+onMounted(() => {
+  void loadScore();
+});
 </script>
 
 <style scoped>

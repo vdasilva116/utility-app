@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { supabase } from 'boot/supabase';
 
 interface ScoreEntry {
   name: string;
@@ -61,7 +62,6 @@ const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const gameFinished = ref(false);
 const playerName = ref('');
 const leaderboard = ref<ScoreEntry[]>([]);
-
 const allMatched = computed(() => matched.value.every((v) => v));
 
 function shuffle() {
@@ -116,28 +116,47 @@ function resetGame() {
   startGame();
 }
 
-function saveScore() {
+async function saveScore() {
   if (!playerName.value.trim()) return;
-  leaderboard.value.push({
+
+  const { error } = await supabase.from('scores_memory').insert({
     name: playerName.value.trim(),
     moves: moves.value,
     time: elapsedSeconds.value,
   });
-  leaderboard.value.sort((a, b) => a.moves - b.moves || a.time - b.time);
-  leaderboard.value = leaderboard.value.slice(0, 5);
-  localStorage.setItem('memoryScores', JSON.stringify(leaderboard.value));
+
+  if (error) {
+    console.error('Erreur enregistrement score memory', error);
+  }
+
+  await fetchLeaderboard();
   resetGame();
 }
 
-function clearLeaderboard() {
+async function clearLeaderboard() {
+  const { error } = await supabase.from('scores_memory').delete().neq('id', '');
+  if (error) {
+    console.error('Erreur suppression scores memory', error);
+  }
   leaderboard.value = [];
-  localStorage.removeItem('memoryScores');
+}
+
+async function fetchLeaderboard() {
+  const { data, error } = await supabase
+    .from('scores_memory')
+    .select('*')
+    .order('moves', { ascending: true })
+    .order('time', { ascending: true })
+    .limit(5);
+
+  if (!error && data) {
+    leaderboard.value = data;
+  }
 }
 
 onMounted(() => {
-  const stored = localStorage.getItem('memoryScores');
-  if (stored) leaderboard.value = JSON.parse(stored);
   startGame();
+  void fetchLeaderboard();
 });
 
 onBeforeUnmount(() => {

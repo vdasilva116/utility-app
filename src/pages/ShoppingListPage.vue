@@ -44,25 +44,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { supabase } from 'boot/supabase';
 
 interface ShoppingItem {
+  id?: string;
   name: string;
   promo: boolean;
   quantity: number;
 }
 
-const shoppingItems = ref<ShoppingItem[]>(
-  JSON.parse(localStorage.getItem('shoppingItems') || '[]'),
-);
-
-watch(
-  shoppingItems,
-  (val) => {
-    localStorage.setItem('shoppingItems', JSON.stringify(val));
-  },
-  { deep: true },
-);
+const shoppingItems = ref<ShoppingItem[]>([]);
 
 const newItem = ref('');
 const isPromo = ref(false);
@@ -81,9 +73,14 @@ function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function addItem() {
+async function addItem() {
   const trimmed = newItem.value.trim();
   if (!trimmed) return;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
 
   const existing = shoppingItems.value.find(
     (item) => item.name.toLowerCase() === trimmed.toLowerCase() && item.promo === isPromo.value,
@@ -91,36 +88,49 @@ function addItem() {
 
   if (existing) {
     existing.quantity++;
+    await supabase
+      .from('shopping_items')
+      .update({ quantity: existing.quantity })
+      .eq('id', existing.id);
   } else {
     const newEntry: ShoppingItem = {
       name: trimmed,
       promo: isPromo.value,
       quantity: 1,
     };
-    shoppingItems.value = isPromo.value
-      ? [newEntry, ...shoppingItems.value]
-      : [...shoppingItems.value, newEntry];
+    const { data } = await supabase
+      .from('shopping_items')
+      .insert({ ...newEntry, user_id: user.id })
+      .select()
+      .single();
+
+    if (data) {
+      shoppingItems.value.push(data);
+    }
   }
 
   newItem.value = '';
   isPromo.value = false;
 }
 
-function incrementItem(item: ShoppingItem) {
+async function incrementItem(item: ShoppingItem) {
   item.quantity++;
+  await supabase.from('shopping_items').update({ quantity: item.quantity }).eq('id', item.id);
 }
 
-function decrementItem(item: ShoppingItem) {
+async function decrementItem(item: ShoppingItem) {
   if (item.quantity > 1) {
     item.quantity--;
+    await supabase.from('shopping_items').update({ quantity: item.quantity }).eq('id', item.id);
   } else {
-    const index = shoppingItems.value.indexOf(item);
-    if (index !== -1) shoppingItems.value.splice(index, 1);
+    shoppingItems.value = shoppingItems.value.filter((i) => i.id !== item.id);
+    await supabase.from('shopping_items').delete().eq('id', item.id);
   }
 }
 
-function clearList() {
+async function clearList() {
   shoppingItems.value = [];
+  await supabase.from('shopping_items').delete().neq('id', ''); // supprime tout
 }
 
 function copyList() {
@@ -143,6 +153,19 @@ function copyList() {
     },
   );
 }
+
+onMounted(async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data, error } = await supabase.from('shopping_items').select('*').eq('user_id', user.id);
+
+  if (!error && data) {
+    shoppingItems.value = data;
+  }
+});
 </script>
 
 <style scoped>

@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { supabase } from 'boot/supabase';
 
 interface ScoreEntry {
   name: string;
@@ -54,7 +55,7 @@ const apple = ref<{ x: number; y: number }>({ x: 0, y: 0 });
 const score = ref(0);
 const playerName = ref('');
 const elapsedTime = ref(0);
-const bestScores = ref<ScoreEntry[]>(JSON.parse(localStorage.getItem('snake-scores') || '[]'));
+const bestScores = ref<ScoreEntry[]>([]);
 const gameOver = ref(false);
 
 let interval: ReturnType<typeof setInterval> | null = null;
@@ -150,18 +151,42 @@ function handleKey(e: KeyboardEvent) {
   else if (e.key === 'ArrowRight' && dir !== 'left') direction.value = 'right';
 }
 
-function saveScore() {
+async function saveScore() {
   const name = playerName.value.trim() || 'Anonyme';
-  bestScores.value.push({ name, score: score.value, time: elapsedTime.value });
-  bestScores.value.sort((a, b) => b.score - a.score || a.time - b.time);
-  bestScores.value = bestScores.value.slice(0, 5);
-  localStorage.setItem('snake-scores', JSON.stringify(bestScores.value));
+
+  const { error } = await supabase.from('scores_snake').insert({
+    name,
+    score: score.value,
+    time: elapsedTime.value,
+  });
+
+  if (error) {
+    console.error('Erreur lors de l’enregistrement du score :', error);
+  }
+
+  await fetchLeaderboard();
   gameOver.value = false;
 }
 
-function resetScores() {
+async function resetScores() {
+  const { error } = await supabase.from('scores_snake').delete().neq('id', '');
+  if (error) {
+    console.error('Erreur lors de la réinitialisation des scores :', error);
+  }
   bestScores.value = [];
-  localStorage.removeItem('snake-scores');
+}
+
+async function fetchLeaderboard() {
+  const { data, error } = await supabase
+    .from('scores_snake')
+    .select('*')
+    .order('score', { ascending: false })
+    .order('time', { ascending: true })
+    .limit(5);
+
+  if (!error && data) {
+    bestScores.value = data;
+  }
 }
 
 onMounted(() => {
@@ -169,6 +194,7 @@ onMounted(() => {
     ctx.value = canvas.value.getContext('2d');
     window.addEventListener('keydown', handleKey);
     initGame();
+    void fetchLeaderboard();
   }
 });
 

@@ -1,5 +1,3 @@
-// MealPlanner - version locale avec localStorage (repas et tâches stockées localement)
-
 <template>
   <q-page class="q-pa-md">
     <div class="row q-mb-sm q-gutter-sm items-center">
@@ -100,40 +98,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { supabase } from 'boot/supabase';
 
 interface MealEntry {
   lunch: string;
   dinner: string;
 }
+
+interface MealRow {
+  id: string;
+  date: string;
+  lunch: string | null;
+  dinner: string | null;
+}
+
 interface TaskItem {
-  id: number;
+  id: string;
   date: string;
   content: string;
 }
 
+const meals = ref<Record<string, MealEntry>>({});
+const tasks = ref<TaskItem[]>([]);
 const currentDate = ref(new Date());
-const meals = ref<Record<string, MealEntry>>(JSON.parse(localStorage.getItem('meals') || '{}'));
-const tasks = ref<TaskItem[]>(JSON.parse(localStorage.getItem('tasks') || '[]'));
 const newTaskText = ref('');
 const selectedDayKey = ref<string>('');
 const daysOfWeek = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI', 'DIMANCHE'];
-
-watch(
-  meals,
-  (newVal) => {
-    localStorage.setItem('meals', JSON.stringify(newVal));
-  },
-  { deep: true },
-);
-
-watch(
-  tasks,
-  (newVal) => {
-    localStorage.setItem('tasks', JSON.stringify(newVal));
-  },
-  { deep: true },
-);
 
 function getDateKey(date: Date): string {
   return date.toISOString().split('T')[0] ?? '';
@@ -143,24 +134,66 @@ function dateTasks(dateKey: string) {
   return tasks.value.filter((t) => t.date === dateKey);
 }
 
-function saveMeal(date: string, field: 'lunch' | 'dinner', value: string) {
-  const meal: MealEntry = meals.value[date] ?? { lunch: '', dinner: '' };
-  meal[field] = value;
-  meals.value[date] = meal;
+async function saveMeal(date: string, field: 'lunch' | 'dinner', value: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const existing = meals.value[date] ?? { lunch: '', dinner: '' };
+  existing[field] = value;
+  meals.value[date] = existing;
+
+  const { data: found } = await supabase
+    .from('meals')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('date', date)
+    .maybeSingle();
+
+  if (found?.id) {
+    await supabase
+      .from('meals')
+      .update({ [field]: value })
+      .eq('id', found.id);
+  } else {
+    await supabase.from('meals').insert({
+      user_id: user.id,
+      date,
+      [field]: value,
+    });
+  }
 }
 
-function addTask() {
+async function addTask() {
   const content = newTaskText.value.trim();
   const date = selectedDayKey.value;
   if (!content || !date) return;
-  const newId = Date.now();
-  tasks.value.push({ id: newId, date, content });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert([{ user_id: user.id, date, content }])
+    .select()
+    .single();
+
+  if (!error && data) {
+    tasks.value.push(data);
+  }
+
   newTaskText.value = '';
   selectedDayKey.value = '';
 }
 
-function removeTask(id: number) {
+async function removeTask(id: string) {
   tasks.value = tasks.value.filter((t) => t.id !== id);
+  await supabase.from('tasks').delete().eq('id', id);
 }
 
 function getMonthDays(): Date[] {
@@ -211,6 +244,28 @@ function prevMonth() {
     1,
   );
 }
+
+onMounted(async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const { data: mealData } = await supabase.from('meals').select('*').eq('user_id', user.id);
+
+  meals.value = {};
+  mealData?.forEach((m: MealRow) => {
+    meals.value[m.date] = {
+      lunch: m.lunch || '',
+      dinner: m.dinner || '',
+    };
+  });
+
+  const { data: taskData } = await supabase.from('tasks').select('*').eq('user_id', user.id);
+
+  tasks.value = taskData ?? [];
+});
 </script>
 
 <style scoped>

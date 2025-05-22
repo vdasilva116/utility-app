@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { supabase } from 'boot/supabase';
 
 interface ScoreEntry {
   name: string;
@@ -138,24 +139,46 @@ function resetGame() {
   addRandomTile();
 }
 
-function saveScore() {
+async function fetchLeaderboard() {
+  const { data, error } = await supabase
+    .from('scores_2048')
+    .select('*')
+    .order('score', { ascending: false })
+    .limit(5);
+
+  if (!error && data) {
+    leaderboard.value = data;
+  }
+}
+
+async function saveScore() {
   if (!playerName.value.trim()) return;
-  leaderboard.value.push({ name: playerName.value.trim(), score: score.value });
-  leaderboard.value.sort((a, b) => b.score - a.score);
-  leaderboard.value = leaderboard.value.slice(0, 5);
-  localStorage.setItem('game2048Scores', JSON.stringify(leaderboard.value));
+
+  const { error } = await supabase.from('scores_2048').insert({
+    name: playerName.value.trim(),
+    score: score.value,
+  });
+
+  if (error) {
+    console.error("Erreur d'enregistrement", error);
+  }
+
+  await fetchLeaderboard();
   resetGame();
 }
 
-function clearLeaderboard() {
+async function clearLeaderboard() {
+  const { error } = await supabase.from('scores_2048').delete().neq('id', '');
+  if (error) {
+    console.error('Erreur suppression scores', error);
+  }
   leaderboard.value = [];
-  localStorage.removeItem('game2048Scores');
 }
 
 onMounted(() => {
-  const stored = localStorage.getItem('game2048Scores');
-  if (stored) leaderboard.value = JSON.parse(stored);
   resetGame();
+  void fetchLeaderboard();
+
   window.addEventListener('keydown', (e) => {
     if (gameOver.value) return;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {

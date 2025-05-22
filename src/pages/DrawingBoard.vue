@@ -13,7 +13,10 @@
         @mousemove="draw"
         @mouseup="stopDrawing"
         @mouseleave="stopDrawing"
-      ></canvas>
+        @touchstart.prevent="startDrawingTouch"
+        @touchmove.prevent="drawTouch"
+        @touchend="stopDrawing"
+      />
     </div>
 
     <div class="row q-gutter-md items-center q-mt-md">
@@ -42,10 +45,8 @@ const isDrawing = ref(false);
 const color = ref('black');
 const lineWidth = ref(3);
 const isEraser = ref(false);
-
 const startX = ref(0);
 const startY = ref(0);
-
 const colors = [
   { label: 'Noir', value: 'black' },
   { label: 'Rouge', value: 'red' },
@@ -97,6 +98,35 @@ function exportCanvas() {
   link.href = dataUrl;
   link.download = 'dessin.png';
   link.click();
+}
+
+function getTouchPos(e: TouchEvent) {
+  if (!canvas.value || !e.touches.length) return { x: 0, y: 0 };
+  const rect = canvas.value.getBoundingClientRect();
+  const touch = e.touches[0]!;
+  const x = ((touch.clientX - rect.left) * canvas.value.width) / canvas.value.clientWidth;
+  const y = ((touch.clientY - rect.top) * canvas.value.height) / canvas.value.clientHeight;
+  return { x, y };
+}
+
+function startDrawingTouch(e: TouchEvent) {
+  if (!ctx.value || !canvas.value) return;
+  const { x, y } = getTouchPos(e);
+  startX.value = x;
+  startY.value = y;
+  isDrawing.value = true;
+  ctx.value.beginPath();
+  ctx.value.moveTo(x, y);
+}
+
+function drawTouch(e: TouchEvent) {
+  if (!isDrawing.value || !ctx.value || !canvas.value) return;
+  const { x, y } = getTouchPos(e);
+  ctx.value.lineWidth = lineWidth.value;
+  ctx.value.strokeStyle = isEraser.value ? 'white' : color.value;
+  ctx.value.lineCap = 'round';
+  ctx.value.lineTo(x, y);
+  ctx.value.stroke();
 }
 
 onMounted(() => {

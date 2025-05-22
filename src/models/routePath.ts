@@ -1,5 +1,6 @@
 export const routePath = {
   home: '/home',
+  login: '/login',
   calendar: '/calendar',
   shopping: '/shopping',
   notepad: '/notepad',

@@ -13,7 +13,7 @@
     </div>
 
     <q-list bordered separator>
-      <q-item v-for="(note, index) in notes" :key="index" clickable @click="editNote(index)">
+      <q-item v-for="note in notes" :key="note.id" clickable @click="editNote(note.id)">
         <q-item-section>
           {{ note.title || '(Note sans titre)' }}
         </q-item-section>
@@ -26,49 +26,66 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { supabase } from 'boot/supabase';
 
 interface Note {
+  id: string;
   title: string;
   content: string;
 }
 
-const stored = localStorage.getItem('notes');
-let parsed: Note[] = [];
-
-try {
-  parsed = JSON.parse(stored || '[]');
-  if (!Array.isArray(parsed) || !parsed.every((n) => 'title' in n && 'content' in n)) {
-    parsed = [];
-  }
-} catch {
-  parsed = [];
-}
-
-const notes = ref<Note[]>(parsed);
+const notes = ref<Note[]>([]);
 const newNoteTitle = ref('');
 const router = useRouter();
 
-function createNote() {
+function editNote(id: string) {
+  void router.push(`/note/${id}`);
+}
+
+async function loadNotes() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('id', { ascending: false });
+
+  if (!error && data) {
+    notes.value = data;
+  }
+}
+
+async function createNote() {
   const title = newNoteTitle.value.trim();
   if (!title) return;
-  notes.value.unshift({ title, content: '' });
-  newNoteTitle.value = '';
-  localStorage.setItem('notes', JSON.stringify(notes.value));
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from('notes')
+    .insert([{ user_id: user.id, title, content: '' }])
+    .select()
+    .single();
+
+  if (!error && data) {
+    notes.value.unshift(data);
+    newNoteTitle.value = '';
+    void router.push(`/note/${data.id}`);
+  }
 }
 
-function editNote(index: number) {
-  void router.push(`/notepad/${index}`);
-}
-
-watch(
-  notes,
-  (val) => {
-    localStorage.setItem('notes', JSON.stringify(val));
-  },
-  { deep: true },
-);
+onMounted(() => {
+  void loadNotes();
+});
 </script>
 
 <style scoped>
