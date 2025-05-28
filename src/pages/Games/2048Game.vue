@@ -1,6 +1,6 @@
 <template>
-  <q-page class="q-pa-md row justify-center">
-    <div class="column items-center col-8">
+  <q-page class="q-pa-md row justify-center q-gutter-lg">
+    <div class="column items-center col-12 col-md-8">
       <div class="row items-center justify-between full-width q-mb-sm">
         <div class="text-h5">🧩 Jeu 2048</div>
         <q-btn label="Relancer" color="secondary" @click="resetGame" />
@@ -16,22 +16,35 @@
         </div>
       </div>
 
-      <div v-if="gameOver" class="q-mt-md text-negative">
+      <div v-if="gameOver" class="q-mt-md text-negative text-center">
         💀 Partie terminée !
-        <q-input v-model="playerName" label="Ton nom" class="q-mt-md" outlined dense />
+        <q-input
+          v-model="playerName"
+          label="Ton nom"
+          class="q-mt-md"
+          outlined
+          dense
+          style="max-width: 300px"
+        />
         <q-btn label="Enregistrer le score" color="primary" class="q-mt-sm" @click="saveScore" />
       </div>
     </div>
 
-    <div class="col-4 q-ml-md">
-      <div class="text-h6">🏆 Meilleurs scores</div>
+    <div class="col-12 col-md-4">
+      <div class="text-h6 q-mb-sm">🏆 Meilleurs scores</div>
       <q-list bordered separator class="q-mt-sm">
         <q-item v-for="(s, i) in leaderboard" :key="i">
           <q-item-section>{{ s.name }}</q-item-section>
           <q-item-section>{{ s.score }}</q-item-section>
         </q-item>
       </q-list>
-      <q-btn flat label="Reset scores" color="negative" class="q-mt-sm" @click="clearLeaderboard" />
+      <q-btn
+        flat
+        label="Reset scores"
+        color="negative"
+        class="q-mt-sm full-width"
+        @click="clearLeaderboard"
+      />
     </div>
   </q-page>
 </template>
@@ -140,9 +153,16 @@ function resetGame() {
 }
 
 async function fetchLeaderboard() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
   const { data, error } = await supabase
     .from('scores_2048')
     .select('*')
+    .eq('user_id', user.id)
     .order('score', { ascending: false })
     .limit(5);
 
@@ -154,9 +174,19 @@ async function fetchLeaderboard() {
 async function saveScore() {
   if (!playerName.value.trim()) return;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    console.error('Utilisateur non connecté');
+    return;
+  }
+
   const { error } = await supabase.from('scores_2048').insert({
     name: playerName.value.trim(),
     score: score.value,
+    user_id: user.id,
   });
 
   if (error) {
@@ -168,7 +198,10 @@ async function saveScore() {
 }
 
 async function clearLeaderboard() {
-  const { error } = await supabase.from('scores_2048').delete().neq('id', '');
+  const { error } = await supabase
+    .from('scores_2048')
+    .delete()
+    .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
   if (error) {
     console.error('Erreur suppression scores', error);
   }
@@ -204,5 +237,6 @@ onMounted(() => {
   justify-content: center;
   font-weight: bold;
   border-radius: 6px;
+  font-size: 20px;
 }
 </style>

@@ -2,6 +2,15 @@
   <q-layout view="hHh LpR fFf">
     <q-header elevated class="bg-white text-primary">
       <q-toolbar v-if="isLoggedIn" class="q-py-md">
+        <q-btn
+          dense
+          flat
+          round
+          icon="menu"
+          @click="leftDrawerOpen = !leftDrawerOpen"
+          class="q-mr-sm"
+        />
+
         <q-toolbar-title>
           <q-icon name="home" class="q-mr-sm" />
           <span class="text-h6">Utility App</span>
@@ -120,9 +129,9 @@
 
 <script setup lang="ts">
 import { routePath } from 'src/models/routePath';
-import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { supabase } from 'boot/supabase';
+import { ref, onMounted } from 'vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -147,7 +156,7 @@ onMounted(async () => {
     await router.push('/login');
   }
 
-  supabase.auth.onAuthStateChange((event, session) => {
+  supabase.auth.onAuthStateChange((session) => {
     isLoggedIn.value = !!session;
     if (!session) {
       void router.push('/login');

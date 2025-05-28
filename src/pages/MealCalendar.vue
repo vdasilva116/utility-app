@@ -22,68 +22,57 @@
       <q-btn label="Ajouter" dense color="primary" @click="addTask" class="q-pa-sm" />
     </div>
 
-    <div class="row items-center q-mb-md justify-between">
-      <q-btn icon="chevron_left" @click="prevMonth" flat />
-      <div class="text-h6">{{ monthName }} {{ currentDate.getFullYear() }}</div>
-      <q-btn icon="chevron_right" @click="nextMonth" flat />
-    </div>
+    <div class="calendar-container">
+      <div class="calendar-header">
+        <q-btn icon="chevron_left" @click="prevMonth" flat />
+        <div class="calendar-title">{{ monthName }} {{ currentDate.getFullYear() }}</div>
+        <q-btn icon="chevron_right" @click="nextMonth" flat />
+      </div>
 
-    <div class="row text-center bg-grey-3">
-      <div v-for="(day, i) in daysOfWeek" :key="i" class="col text-bold">{{ day }}</div>
-    </div>
-
-    <div class="row wrap">
-      <div
-        v-for="(day, index) in calendarDays"
-        :key="index"
-        class="meal-cell col-xs-12 col-sm-1 col-md-1 q-pa-sm"
-        style="min-height: 190px; border: 1px solid #ccc; overflow: hidden"
-      >
-        <div class="text-caption text-grey">
-          <span v-if="day.getMonth() === currentDate.getMonth()">{{ day.getDate() }}</span>
+      <div class="calendar-grid">
+        <div v-for="(day, i) in daysOfWeek" :key="'head-' + i" class="calendar-day-header">
+          {{ day }}
         </div>
 
-        <div class="text-subtitle2 text-primary q-mb-xs" v-if="dateTasks(getDateKey(day)).length">
-          <div
-            v-for="task in dateTasks(getDateKey(day))"
-            :key="task.id"
-            class="ellipsis row items-center no-wrap"
-            style="font-size: 12px"
-          >
-            <q-icon
-              name="remove_circle"
-              size="16px"
-              color="negative"
-              class="q-mr-xs cursor-pointer"
-              @click="removeTask(task.id)"
-            />
-            <span v-if="task.content.length > 20">
-              <q-tooltip anchor="top middle">{{ task.content }}</q-tooltip>
-              - {{ task.content }}
-            </span>
-            <span v-else>- {{ task.content }}</span>
+        <div
+          v-for="(day, index) in calendarDays"
+          :key="'day-' + index"
+          class="calendar-cell"
+          :class="{ 'not-current-month': day.getMonth() !== currentDate.getMonth() }"
+        >
+          <div class="cell-header">
+            <span>{{ day.getDate() }}</span>
           </div>
-        </div>
 
-        <template v-if="day.getMonth() === currentDate.getMonth()">
+          <div class="cell-tasks">
+            <div v-for="task in dateTasks(getDateKey(day))" :key="task.id" class="task">
+              <q-icon
+                name="remove_circle"
+                size="16px"
+                color="negative"
+                class="q-mr-xs cursor-pointer"
+                @click="removeTask(task.id)"
+              />
+              <span>{{ task.content }}</span>
+            </div>
+          </div>
+
           <q-input
+            v-if="day.getMonth() === currentDate.getMonth()"
             type="textarea"
-            autogrow
             dense
-            filled
+            autogrow
             :model-value="meals[getDateKey(day)]?.lunch ?? ''"
             @update:model-value="(value) => saveMeal(getDateKey(day), 'lunch', String(value ?? ''))"
             placeholder="Midi"
             class="q-mt-xs"
           />
 
-          <q-separator color="grey-4" class="q-my-xs" />
-
           <q-input
+            v-if="day.getMonth() === currentDate.getMonth()"
             type="textarea"
-            autogrow
             dense
-            filled
+            autogrow
             :model-value="meals[getDateKey(day)]?.dinner ?? ''"
             @update:model-value="
               (value) => saveMeal(getDateKey(day), 'dinner', String(value ?? ''))
@@ -91,7 +80,7 @@
             placeholder="Soir"
             class="q-mt-xs"
           />
-        </template>
+        </div>
       </div>
     </div>
   </q-page>
@@ -131,7 +120,11 @@ function getDateKey(date: Date): string {
 }
 
 function dateTasks(dateKey: string) {
-  return tasks.value.filter((t) => t.date === dateKey);
+  const currentMonth = currentDate.value.getMonth();
+  return tasks.value.filter((t) => {
+    const taskDate = new Date(t.date);
+    return t.date === dateKey && taskDate.getMonth() === currentMonth;
+  });
 }
 
 async function saveMeal(date: string, field: 'lunch' | 'dinner', value: string) {
@@ -269,7 +262,71 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.meal-cell {
-  width: 14.28%;
+.calendar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-title {
+  font-weight: bold;
+  font-size: 18px;
+  text-transform: capitalize;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: 600;
+  padding: 6px 0;
+  background: #f0f0f0;
+}
+
+.calendar-cell {
+  border: 1px solid #ccc;
+  min-height: 180px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  background: white;
+}
+
+.not-current-month {
+  background-color: #f9f9f9;
+  color: #bbb;
+}
+
+.cell-header {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.cell-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 </style>

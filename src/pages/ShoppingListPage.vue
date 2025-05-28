@@ -1,6 +1,6 @@
 <template>
   <q-page class="q-pa-md">
-    <div class="q-mb-md row items-end q-gutter-sm">
+    <div class="q-mb-md row items-end q-gutter-sm sticky-bar">
       <q-input
         v-model="newItem"
         label="Ajouter un produit"
@@ -9,11 +9,23 @@
         class="col"
         dense
       />
+      <q-input
+        v-model.number="newItemQuantity"
+        label="Qté"
+        type="number"
+        min="1"
+        @keyup.enter="addItem"
+        outlined
+        dense
+        class="col-2"
+      />
       <q-checkbox v-model="isPromo" label="Promo" />
       <q-btn label="Ajouter" @click="addItem" color="primary" />
       <q-btn label="Vider la liste" @click="clearList" color="negative" flat />
       <q-btn label="Copier la liste" @click="copyList" color="secondary" flat />
     </div>
+
+    <div ref="middleRef" style="height: 1px"></div>
 
     <div v-if="groupedItems.promo.length" class="q-mb-lg">
       <div class="text-h6 q-mb-sm">🟢 En promo</div>
@@ -40,11 +52,13 @@
         </q-item>
       </q-list>
     </div>
+
+    <div ref="bottomRef" style="height: 1px"></div>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { supabase } from 'boot/supabase';
 
 interface ShoppingItem {
@@ -57,7 +71,10 @@ interface ShoppingItem {
 const shoppingItems = ref<ShoppingItem[]>([]);
 
 const newItem = ref('');
+const newItemQuantity = ref(1);
 const isPromo = ref(false);
+const middleRef = ref<HTMLElement | null>(null);
+const bottomRef = ref<HTMLElement | null>(null);
 
 const groupedItems = computed(() => {
   const promo: ShoppingItem[] = [];
@@ -82,12 +99,14 @@ async function addItem() {
   } = await supabase.auth.getUser();
   if (!user) return;
 
+  const quantity = newItemQuantity.value || 1;
+
   const existing = shoppingItems.value.find(
     (item) => item.name.toLowerCase() === trimmed.toLowerCase() && item.promo === isPromo.value,
   );
 
   if (existing) {
-    existing.quantity++;
+    existing.quantity += quantity;
     await supabase
       .from('shopping_items')
       .update({ quantity: existing.quantity })
@@ -96,7 +115,7 @@ async function addItem() {
     const newEntry: ShoppingItem = {
       name: trimmed,
       promo: isPromo.value,
-      quantity: 1,
+      quantity,
     };
     const { data } = await supabase
       .from('shopping_items')
@@ -109,7 +128,20 @@ async function addItem() {
     }
   }
 
+  if (!isPromo.value) {
+    void nextTick(() => {
+      bottomRef.value?.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
+  if (isPromo.value) {
+    void nextTick(() => {
+      middleRef.value?.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
   newItem.value = '';
+  newItemQuantity.value = 1;
   isPromo.value = false;
 }
 
@@ -129,8 +161,18 @@ async function decrementItem(item: ShoppingItem) {
 }
 
 async function clearList() {
+  const { error } = await supabase
+    .from('shopping_items')
+    .delete()
+    .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+
+  if (error) {
+    console.error('Erreur suppression :', error.message);
+    alert('Erreur lors de la suppression.');
+    return;
+  }
+
   shoppingItems.value = [];
-  await supabase.from('shopping_items').delete().neq('id', ''); // supprime tout
 }
 
 function copyList() {
@@ -171,5 +213,14 @@ onMounted(async () => {
 <style scoped>
 .text-h6 {
   font-weight: 600;
+}
+
+.sticky-bar {
+  position: sticky;
+  top: 55px;
+  background: white;
+  z-index: 100;
+  padding: 1rem 0;
+  border-bottom: 1px solid #ccc;
 }
 </style>

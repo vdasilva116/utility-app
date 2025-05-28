@@ -1,37 +1,39 @@
 <template>
-  <q-page class="q-pa-md row q-col-gutter-xl">
-    <div class="col-8">
-      <div class="text-h5 q-mb-md">🐍 Snake</div>
+  <q-page class="q-pa-md">
+    <div class="q-gutter-md row items-start justify-center">
+      <div class="col-12 col-md-8 column items-center">
+        <div class="text-h5 q-mb-md text-center">🐍 Snake</div>
 
-      <canvas ref="canvas" width="400" height="400" class="snake-canvas" />
+        <canvas ref="canvas" width="400" height="400" class="snake-canvas q-mb-md" />
 
-      <div class="q-mt-md">Score : {{ score }}</div>
-      <div>Temps : {{ elapsedTime }}s</div>
+        <div class="text-subtitle2 q-mb-sm">Score : {{ score }}</div>
+        <div class="text-subtitle2">Temps : {{ elapsedTime }}s</div>
 
-      <div v-if="gameOver" class="q-mt-md">
-        <div class="text-h6 text-negative">💀 Partie terminée !</div>
-        <q-input v-model="playerName" label="Votre nom" dense outlined class="q-mt-sm" />
-        <q-btn label="Sauvegarder" color="primary" @click="saveScore" class="q-mt-sm" />
+        <div v-if="gameOver" class="q-mt-md text-center">
+          <div class="text-h6 text-negative">💀 Partie terminée !</div>
+          <q-input v-model="playerName" label="Votre nom" dense outlined class="q-mt-sm" />
+          <q-btn label="Sauvegarder" color="primary" @click="saveScore" class="q-mt-sm" />
+        </div>
+
+        <q-btn label="Rejouer" color="primary" class="q-mt-md" @click="initGame" />
       </div>
 
-      <q-btn label="Rejouer" color="primary" class="q-mt-md" @click="initGame" />
-    </div>
-
-    <div class="col-4">
-      <div class="text-h6 q-mb-sm">🏆 Meilleurs scores</div>
-      <q-list bordered separator>
-        <q-item v-for="(s, i) in bestScores" :key="i">
-          <q-item-section>{{ s.name || 'Anonyme' }}</q-item-section>
-          <q-item-section>{{ s.score }} pts - {{ s.time }}s</q-item-section>
-        </q-item>
-      </q-list>
-      <q-btn
-        label="Réinitialiser le classement"
-        color="negative"
-        class="q-mt-md"
-        @click="resetScores"
-        flat
-      />
+      <div class="col-12 col-md-4">
+        <div class="text-h6 q-mb-sm text-center">🏆 Meilleurs scores</div>
+        <q-list bordered separator class="score-list">
+          <q-item v-for="(s, i) in bestScores" :key="i">
+            <q-item-section>{{ s.name || 'Anonyme' }}</q-item-section>
+            <q-item-section class="text-right">{{ s.score }} pts - {{ s.time }}s</q-item-section>
+          </q-item>
+        </q-list>
+        <q-btn
+          label="Réinitialiser le classement"
+          color="negative"
+          class="q-mt-md full-width"
+          @click="resetScores"
+          flat
+        />
+      </div>
     </div>
   </q-page>
 </template>
@@ -153,11 +155,13 @@ function handleKey(e: KeyboardEvent) {
 
 async function saveScore() {
   const name = playerName.value.trim() || 'Anonyme';
+  if (!userId.value) return;
 
   const { error } = await supabase.from('scores_snake').insert({
     name,
     score: score.value,
     time: elapsedTime.value,
+    user_id: userId.value,
   });
 
   if (error) {
@@ -169,17 +173,24 @@ async function saveScore() {
 }
 
 async function resetScores() {
-  const { error } = await supabase.from('scores_snake').delete().neq('id', '');
+  if (!userId.value) return;
+
+  const { error } = await supabase.from('scores_snake').delete().eq('user_id', userId.value);
+
   if (error) {
     console.error('Erreur lors de la réinitialisation des scores :', error);
   }
+
   bestScores.value = [];
 }
 
 async function fetchLeaderboard() {
+  if (!userId.value) return;
+
   const { data, error } = await supabase
     .from('scores_snake')
     .select('*')
+    .eq('user_id', userId.value)
     .order('score', { ascending: false })
     .order('time', { ascending: true })
     .limit(5);
@@ -189,12 +200,17 @@ async function fetchLeaderboard() {
   }
 }
 
-onMounted(() => {
+const userId = ref<string | null>(null);
+
+onMounted(async () => {
+  const { data } = await supabase.auth.getUser();
+  userId.value = data.user?.id || null;
+
   if (canvas.value) {
     ctx.value = canvas.value.getContext('2d');
     window.addEventListener('keydown', handleKey);
     initGame();
-    void fetchLeaderboard();
+    await fetchLeaderboard();
   }
 });
 
