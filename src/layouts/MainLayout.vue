@@ -156,7 +156,7 @@ onMounted(async () => {
     await router.push('/login');
   }
 
-  supabase.auth.onAuthStateChange((session) => {
+  supabase.auth.onAuthStateChange((_event, session) => {
     isLoggedIn.value = !!session;
     if (!session) {
       void router.push('/login');
