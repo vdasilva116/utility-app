@@ -16,6 +16,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'note/:id', component: () => import('pages/BlocNote.vue'), props: true },
       { path: 'drawingboard', component: () => import('pages/DrawingBoard.vue') },
       { path: 'calculator', component: () => import('pages/CalculatorScientifist.vue') },
+      { path: 'dailyguess', component: () => import('pages/DailyGuessPage.vue') },
       { path: 'listgames', component: () => import('pages/Games/ListGames.vue') },
       { path: 'listgames/tictactoe', component: () => import('pages/Games/TicTacToeGame.vue') },
       { path: 'listgames/snake', component: () => import('pages/Games/SnakeGame.vue') },
