@@ -72,7 +72,13 @@ const hasGuessed = ref(false);
 const userId = ref<string | null>(null);
 
 async function fetchDailyPhrase() {
-  const { data } = await supabase.from('daily_phrase').select('phrase').eq('date', today).single();
+  const { data } = await supabase
+    .from('daily_phrase')
+    .select('phrase, found')
+    .eq('found', false)
+    .limit(1)
+    .single();
+  console.log('Phrase du jour:', data);
 
   if (data?.phrase) {
     wordCount.value = data.phrase.trim().split(' ').length;
@@ -105,8 +111,9 @@ async function submitGuess() {
 
   const { data: phraseData } = await supabase
     .from('daily_phrase')
-    .select('phrase')
-    .eq('date', today)
+    .select('phrase, found')
+    .eq('found', false)
+    .limit(1)
     .single();
 
   if (!phraseData?.phrase) {
