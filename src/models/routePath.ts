@@ -13,5 +13,4 @@ export const routePath = {
   2048: '/listgames/2048',
   drawingboard: '/drawingboard',
   calculator: '/calculator',
-  dailyGuess: '/dailyguess',
 };

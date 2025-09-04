@@ -110,16 +110,6 @@
 
         <q-item
           clickable
-          @click="goTo(routePath.dailyGuess)"
-          :active="route.path === '/dailyguess'"
-          active-class="text-primary"
-        >
-          <q-item-section avatar><q-icon name="circle" /></q-item-section>
-          <q-item-section>Devine phrase</q-item-section>
-        </q-item>
-
-        <q-item
-          clickable
           tag="a"
           href="https://vdasilva116.github.io/password-checker/"
           target="_blank"
